@@ -13,13 +13,14 @@ import scipy.linalg as sl
 from sympy import sqrt, sin, cos
 
 class Manifold:
-    def __init__(self, X, J, H=None):
+    def __init__(self, X, J, H):
         """
         You need to initialize this class with parameterised representation of a manifold.
         think of spherical coordinates that plot out points on a spherical shell for each value of
-        the radius. each shell is its own manifold
+        the radius. each shell is its own manifold that you then can apply methods from differential
+        geometry on.
         """
-        if not isinstance(X, np.ndarray) and isinstance(X, list) or isinstance(X, tuple):
+        if isinstance(X, np.ndarray) and isinstance(X, list) or isinstance(X, tuple):
             X = np.array(X)
         else:
             raise TypeError("X should be a vector or be convertable to a vector")
