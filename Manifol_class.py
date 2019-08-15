@@ -12,15 +12,15 @@ from scipy.integrate import quad
 import scipy.linalg as sl
 from sympy import sqrt, sin, cos
 
+
 class Manifold:
-    def __init__(self, X, J, H):
+    def __init__(self, X, J, H=None):
         """
         You need to initialize this class with parameterised representation of a manifold.
         think of spherical coordinates that plot out points on a spherical shell for each value of
-        the radius. each shell is its own manifold that you then can apply methods from differential
-        geometry on.
+        the radius. each shell is its own manifold
         """
-        if isinstance(X, np.ndarray) and isinstance(X, list) or isinstance(X, tuple):
+        if not isinstance(X, np.ndarray) and isinstance(X, list) or isinstance(X, tuple):
             X = np.array(X)
         else:
             raise TypeError("X should be a vector or be convertable to a vector")
@@ -31,18 +31,33 @@ class Manifold:
             raise TypeError("X should be a vector or be convertable to a vector")
         self.Hermitian = H
         self.X = X
-        self.B = B
         self.J = J
         Jt = J.T
         self.Jt = Jt
         G = np.matmul(J.T, J)
         self.metric_tensor = G
         self.inv_metric_tensor = np.linalg.inv(G)
+        self.detG = np.linalg.det(G)
+
 
 
     def Tensor_rank(self, T):
         rank = np.ndim(T)
         return rank
+
+    def direction_catalogue(self,T):
+        rank = self.Tensor_rank(T)
+        d_c4  = [[-1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,-1]]
+
+        d_c3  = [[-1,0,0],[0,-1,0],[0,0,-1]]
+
+        d_c2 = [[-1,0],[0,-1]]
+        if rank ==4:
+            return d_c4
+        elif rank ==3:
+            return d_c3
+        elif rank ==2:
+            return d_c2
 
 
     def univ_finite_diff(self, Tensor, args, h=1.e-9):
@@ -98,49 +113,7 @@ class Manifold:
                                 tensors of rank greater than 3, but it is easily fixable""")
         return normal_deriv(T)
 
-    def surface2D_curvature_tensor(self, args):
-        """
-        This method calculates the curvature tensor for a surface using local
-        gaussian normal coordinates and the normal itself. This method is only works
-        on 2D surfaces, this is due to the fact that the cross product only works when
-        vectors live an Ambient space of maximum 3 dimensions.
 
-        this tensor {b_myu_ny} is relatied to the riemann curvature tensor
-        in a special way. I might add that as a methdod too.
-
-        INPUT:
-            args (list, vector, tuple):
-                i wasn't really sure how i would implement the finite difference
-                without a coordinate system for the inputs to the tensor object.
-                one needs coordinates to be able to differentiate function. So, the args input
-                should contain coordinates for a point on the surface (manifold) using curvilinear
-                coordinates.
-        RETURN:
-            b (matrix):
-                containing
-        """
-        J = self.J
-
-        if J.shape[1] == 2:
-            def cross_prod(a,b, normalised=True):
-                A = np.array([[0, -a[2], a[1]],
-                              [a[2], 0, -a[0]],
-                              [-a[1], a[0], 0]])
-                C = np.matmul(A, b)
-                if normalised:
-                    return C
-                else:
-                    c = C/np.linalg.norm(C)
-                    return c
-            n = cross_prod(J[0], J[1])
-            n_ny = self.univ_fifnite_diff(n, args)
-
-            curvature_tensor = np.matmul(J.T, n_ny)
-            b = curvature_tensor
-
-            return b
-        else:
-            raise Exception("this tensor works ony on 2D surfaces")
 
 
     def Newt_motor(self, v0, max_iter=100, margin=1.e-4, step=0.0001, h=1.e-9, finite=False, once=False):
@@ -169,7 +142,7 @@ class Manifold:
 
                 elif finite == True:
                     if once ==False:
-                        delta = np.linalg.solve(univ_finite_diffe(v, h), -F(v))
+                        delta = np.linalg.solve(univ_finite_diff(v, h), -F(v))
                         new = delta + v
                         return new
                     elif once == True:
@@ -208,14 +181,11 @@ class Manifold:
                        [0,-1,0],
                        [0,0,-1]]
                 L_A0,L_A1,L_A2 = A.shape[0], A.shape[1], A.shape[2]
-                if p_a == d_c[0]: 
-                
-                #the motivation for this is that: imagine that you had an axis in the negative x-direction attached to the cube
-                # and thta you rotate clockwise, the face facing the forward direction will now
-                #be facing the uppward direction, that is why the non-zero entries are -1.
-                # the same logic applies for the next elif command but in the negative y-axis deriction.
-                # the actuall programming process has nothing to do with this visualisation
-                
+                if p_a == d_c[0]: #the motivation for this is that: imagine ghat you had an axis in the negative x-direction attached to the cube
+                                  # and thta you rotate clockwise, the face facing the forward direction will now
+                                  #be facing the uppward direction, that is why the non-zero entries are -1.
+                                  # the same logic applies for the next elif command but in the negative y-axis deriction.
+                                  # the actuall programming process has nothing to do with this visualisation
                     A_T = np.array([np.array([A[j,i] for j in range(L_A0)]) for i in range(L_A1)])
                     return A_T
                 elif p_a == d_c[1]: # refoemration parallelel to y-axis
@@ -263,7 +233,6 @@ class Manifold:
         """
         X           = self.X
         J, Jt       = self.J, self.inv_J
-        G           =  self.metric_tensor
         G_          =  self.inv_metric_tensor
         T           = Tensor
         rank        = np.ndim(T)
@@ -325,9 +294,9 @@ class Manifold:
                         raise Exception("help_module_rank3: ind equals either 1 or 0")
 
                 if rank == 2:
-                    return help_module_rank2(a, ind)
+                    return help_module_rank2(E, ind)
                 elif rank==3:
-                    return help_module_rank3(a, ind)
+                    return help_module_rank3(E, ind)
 
             def Mathematical_test_module(T1, T2, T3, rank):
                 def scalar_project(T1, T2):
@@ -337,7 +306,7 @@ class Manifold:
                      """
                      L1, L2 = T1.shape, T2.shape
                      m1 = np.array([[mtr(T1[i], T2[j]) for j in range(L2[0])] for i in range(L1[0])])
-                     scalar_m1 = mtr(a=None, b=None, m1)
+                     scalar_m1 = mtr(a=None, b=None, M=m1)
                      return scalar_m1
 
                 def Tensor_permutator(A, rank):
@@ -360,6 +329,7 @@ class Manifold:
                         K = single_tensor_single_matrix
                         L_R = R.shape[0]
                         P = np.array([K(T, R[i]) for i in range(L_R)])
+                        return P
 
                     if not R:
                         return single_tensor_single_matrix(T, M)
@@ -426,7 +396,7 @@ class Manifold:
                             l = len(direction_catalogue)
                             L = np.array([transpose_machinery(A, direction_catalogue[k]) for k in range(l-1)])
                             LL = [np.zeros((L_A1,L_A1,L_A1)) + i for i in L]
-                            return L[-1]
+                            return LL[-1]
                         else:
                             raise Exception(f"your tensor must be a perfect cube,yours has the dimensions: {K}")
 
@@ -449,21 +419,22 @@ class Manifold:
                 ind = L.index(min(L))
                 return last_step(L, R, ind, rank)
 
-            elif ranbk ==3:
+            elif rank ==3:
                 T = Tensor_index_rotator(T, None, lin_comb_axis=True)
                 L, R = Mathematical_test_module(T, _B_, _X_)
                 ind = L.index(min(L))
                 return last_step(L, R, ind, rank)
 
 
-    def TG(self,T, axis, L_R):
+    def TG(self,T, axis, L_R, args_for_the_comparison_tensor_for_the_function_tensortype):
         """
         this function lowers or raises the index of a tensor of rank 1,2, or 3
         axis specifies which index and is a list
         L_R stands for Lower_Raise
         """
-        rank = np.ndim(A)
-        ttt = Tensor_type(self, T, args)
+        args = args_for_the_comparison_tensor_for_the_function_tensortype
+        rank = np.ndim(T)
+        ttt = self.Tensor_type(T, args)
         p_a = axis
         def m(a,b, out=None):
             return np.matmul(a,b, out=None)
@@ -493,25 +464,11 @@ class Manifold:
                     ttt = [ttt[0] +L_R[0], ttt[1] +L_R[1]]
                     return L,ttt
             else:
-                raise Excperion("the following must hold: Lower_raise == [-1,1] or Lower_Riase == [1,-1]")
+                raise Exception("the following must hold: Lower_raise == [-1,1] or Lower_Riase == [1,-1]")
         return Lower_Raise(T, p_a, L_R)
 
     def direct_projection(self, T1, T2, p_a1, p_a2, contraction_order=1, p_a3=None):
-        """
-        this function performs einstein summation over a common index of two tensors of max rank 3. this function assumes that the
-        that the tensors are compatible for summation in the sense that one of the indices is contravariant and the the other is
-        covariant. to choose wich index  from each of the tensors that you want to sum over, you'll need to specify an axis for each
-        tensor, p_a1 and p_a2 respectivelly.
-
-        Inputs:
-            T1, T2 (formal tensors):
-                max rank 3
-            p_a1, p_a2 (lists):
-                refer to the function TG_primer above
-        Returns:
-
-
-        """
+        G = self.metric_tensor
         if contraction_order == 3 and not p_a3:
             raise Exception("you must specify p_a3 to be able to perform a self projection on a rank 4 tensor")
         else:
@@ -525,25 +482,78 @@ class Manifold:
                     return np.trace(m(m(a,b), G))
                 elif not a and not b:
                     return np.trace(m(M, G))
-                elif direct:
+                elif M_direct:
                     return np.trace(M)
 
             r1 = np.ndim(T1)
             r2 = np.ndim(T2)
-            TG_primer = self.TG_primer
+            def TG_primer(T, p_a, rank):
+                    """
+                    THis function primes the tensor for the lowering or the riase
+                    of an index by the the function TG bellow. aka, it chooses
+                    which index TG performs index juggling on.
+                    """
+                    def rotation_module(T, p_a, rank=rank):
+                        A = T
+                        if rank == 3:
+                            d_c = [[-1,0,0],
+                                   [0,-1,0],
+                                   [0,0,-1]]
+                            L_A0,L_A1,L_A2 = A.shape[0], A.shape[1], A.shape[2]
+                            if p_a == d_c[0]: #the motivation for this is that: imagine ghat you had an axis in the negative x-direction attached to the cube
+                                              # and thta you rotate clockwise, the face facing the forward direction will now
+                                              #be facing the uppward direction, that is why the non-zero entries are -1.
+                                              # the same logic applies for the next elif command but but now its in the negative y-axis' deriction.
+                                              # the actuall programming process has nothing to do with this visualisation
+                                A_T = np.array([np.array([A[j,i] for j in range(L_A0)]) for i in range(L_A1)])
+                                return A_T
+                            elif p_a == d_c[1]: # refoemration parallelel to y-axis
+                                A_T = np.array([np.array([A[j].T[i] for j in range(L_A0)]) for i in range(L_A2)])
+                                return A_T
+                            elif p_a == d_c[2]: #leaves it be
+                                return A
+                        elif rank == 2:
+                            d_c = [[-1,0],
+                                   [0,-1]]
+                            if p_a == d_c[0]:
+                                return A.T
+                            elif p_a == d_c[1]:
+                                return A
+                        elif rank == 1:
+                            return A
+
+                    e =  [1,2,3]
+                    if rank in e:
+                        return rotation_module(T, p_a)
+                    elif rank == 4:
+                        d_c  = [[-1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,-1]]
+                        def rank4_rotation(T, t):
+                            def upward_shelve(T):
+                                L = np.array([[T[i, j] for i in range(T.shape[0])] for j in range(T.shape[1])])
+                                return L
+                            Tr = np.array([rotation_module(T[i], t) for i in range(T.shape[0])])
+                            L = upward_shelve(Tr)
+                            return L
+                        if p_a == d_c[0]:
+                            return rank4_rotation(T, [-1,0,0])
+                        elif p_a == d_c[1]:
+                            return rank4_rotation(T, [0,-1,0])
+                        elif p_a == d_c[2]:
+                            return rank4_rotation(T, [0,0,-1])
+                        elif p_a == d_c[3]:
+                            return T
 
             def TT_naive(T1, T2, p_a1, p_a2, r1, r2, contraction_order):
                 T1 = TG_primer(T1, p_a1, r1)
                 T2 = TG_primer(T2, p_a2, r2)
 
-                u = [1,2]
                 def MV_comb(T1, T2, p_a1, p_a2, r1, r2, contraction_order):
                     if contraction_order == 1:
-                        T1 = TG_primer(T1, p_a, r1)
+                        T1 = TG_primer(T1, p_a1, r1)
                         return m(T1, T2)
-                    elif r1 != 2 and r2!= 2 and contrection_order == 2:
+                    elif r1 != 2 and r2!= 2 and contraction_order == 2:
                         raise Exception("you cant contract twice if their first order contraction is a vector")
-                    elif contrection_order == 2:
+                    elif contraction_order == 2:
                         T1 = TG_primer(T1, p_a1)
                         T2 = TG_primer(T2, p_a2)
                         T3 =  m(T1, T2)
@@ -584,29 +594,219 @@ class Manifold:
                         a = order4_trace(T1, T2)
                         s = s = Gtr(a=None, b=None, M=a)
 
-
-                if r1 in u and r1 in u:
-                    return MV_comb(T1, T2, p_a1, p_a2, rank1, rank2)
+                e = [1,2]
+                if r1 in e and r1 in e:
+                    return MV_comb(T1, T2, p_a1, p_a2, r1, r2)
                 else:
                     return TT_comb(T1, T2, p_a1, p_a2, r1, r2, contraction_order)
 
             return TT_naive(T1, T2, p_a1, p_a2, r1, r2, contraction_order)
 
-
     def Christoffel_symbols(self, kind, args):
+        """
+        kind = 1 gives you the fist kind
+        kind = 2 gives you the second kind
+        """
+        J       = self.J
         G       = self.metric_tensor
         G_      = self.inv_metric_tensor
         D       = self.univ_finite_diff
-        TG      = self.TG
         dirr    = self.direct_projection()
+        H       = self.Hermitian
+        d_c     = self.direction_catalogue
 
-        Gamma_down  = 0.5*D(G, args)
-        Gamma_up  = dirr(G_, Gamma1, [0,-1], [-1,0,0])
 
-        if kind == 1:
-            return Gamma_down
-        elif kind == 2:
-            return Gamma_up
+        if not H:
+            Gamma_down   = 0.5*D(G, args)
+            Gamma_up     = dirr(G_, Gamma_down, [0,-1], [-1,0,0])
+
+            if kind == 1:
+                return Gamma_down
+            elif kind == 2:
+                return Gamma_up
+        else:
+            Gamma_down   = dirr(H, J, d_c(H)[-1], d_c(J)[-1])
+            Gamma_up     = dirr(G_, Gamma_down, [0,-1], [-1,0,0])
+
+            if kind == 1:
+                return Gamma_down
+            elif kind ==2:
+                return Gamma_up
+
+
+
+
+    def Cov_deriv(self, T, args):
+        """
+        This function takes the  covariant derivative of a tensor of maximum rank 3
+
+        """
+        n,m         = self.Tensor_type(T, args)
+        Gamma       = self.Christoffel_symbols(2, args)
+        D           = self.univ_finite_diff
+        dirr        = self.direct_projection
+        rank        = np.ndim(T)
+        d_c         = self.direction_catalogue
+        dc_T        = d_c(T)
+        dc_G        = d_c(Gamma)
+        D_T         = D(T, args)
+
+        if rank == 1:
+            if n==1:
+                T_Gamma = dirr(T, Gamma, None, dc_G[1])
+            elif n==0:
+                T_Gamma = -dirr(T, Gamma, None, dc_G[-1])
+            return D_T + T_Gamma
+
+        else:
+            A = np.array([dirr(T, Gamma, dc_T[i], dc_G[2] for i in range(n-1))])
+            B = np.array([dirr(T, Gamma, dc_T[i], dc_G[3] for i in range(n, m+1))])
+            A.sum(axis=0)
+            B.sum(axis=0)
+            C = A+B
+            return C
+
+
+    def surface2D_curvature_tensor(self, args):
+        """
+        This method calculates the curvature tensor for a surface using local
+        gaussian normal coordinates and the normal itself. This method is only works
+        on 2D surfaces, this is due to the fact that the cross product only works when
+        vectors live an Ambient space of maximum 3 dimensions.
+
+        this tensor {b_myu_ny} is relatied to the riemann curvature tensor
+        in a special way. I might add that as a methdod too.
+
+        INPUT:
+            args (list, vector, tuple):
+                i wasn't really sure how i would implement the finite difference
+                without a coordinate system for the inputs to the tensor object.
+                one needs coordinates to be able to differentiate function. So, the args input
+                should contain coordinates for a point on the surface (manifold) using curvilinear
+                coordinates.
+        RETURN:
+            b (matrix):
+                containing
+        """
+        J = self.J
+
+        if J.shape[1] == 2:
+            def cross_prod(a,b, normalised=True):
+                A = np.array([[0, -a[2], a[1]],
+                              [a[2], 0, -a[0]],
+                              [-a[1], a[0], 0]])
+                C = np.matmul(A, b)
+                if normalised:
+                    return C
+                else:
+                    c = C/np.linalg.norm(C)
+                    return c
+            n = cross_prod(J[0], J[1])
+            n_ny = self.univ_fifnite_diff(n, args)
+
+            curvature_tensor = np.matmul(J.T, n_ny)
+            b = curvature_tensor
+
+            return b
+        else:
+            raise Exception("this tensor works ony on 2D surfaces")
+
+
+
+    def levi_civita(self, rank, dim, contravariant=None, covariant=None):
+        """
+        This fucntion creates the so called levi-civita tensor or epsilon permutation symbol.
+        you can create it up to rank 4. The problem is only that i (the programmer) have mever seen
+        how it looks beyond rank 3. for one, the rank 1 and rank 2 versions are good but according to wikipedia
+        the rank 3 version should have only two numbers on every matrix in the cube.
+        """
+
+        if not contravariant and not covariant:
+            raise Exception("you must choose if the levi-civita tensor either is co- or contravariant")
+        else:
+            def eps_gen(*args):
+                def E(*args):
+                    if len(args)==2:
+                        if args[0] > args[1]:
+                            return False
+                        elif args[0] < args[1]:
+                            return True
+                        else:
+                            return None
+                        
+                    MIN = min(list(args)),MAX = max(list(args)), args = list(args)
+                    
+                    if MIN != 0:
+                        comp = tuple([i for i in range(MIN, MAX+2)])
+                        boool = [comp[i] in args for i in range(len(comp))]
+                    else:
+                        comp = [i for i in range(MIN, MAX+1)]
+                        boool = [comp[i] in args for i in range(len(comp))]
+                    if False in boool:
+                        return None
+                    else:
+                        args = list(args)
+                        
+                        def LOL(*list_):
+                            l = len(list_)
+                            def lol(push_forward, *list_ , inv= False):
+                                i = push_forward
+                                E = list(range(l))
+                                if inv == False:
+                                    L =  E[:i+1][::-1] + E[-(len(E) -(i+1)):][::-1]
+                                else:
+                                    L =  E[-(len(E) -(i+1)):] + E[:i+1]
+                                return tuple(L)
+    
+                            e = [lol(i, *list_) for i in range(-1,l-1)]
+                            r = [lol(i, *list_, inv=True) for i in range(-1,l-1)]
+                            return e,r
+                        
+                        Q = LOL(*args)
+                        args = tuple(args)
+                        if args in Q[1]:
+                            return True
+                        elif args in Q[0]:
+                            return False
+                a = E(*args)
+                if contravariant:
+                    b = 1/np.sqrt(detG)
+                elif covariant:
+                    b = np.sqrt(detG)
+                    
+                if a==True:
+                    return b
+                elif a ==False:
+                    return -b
+                elif a ==None:
+                    return 0
+                
+            if rank == 2:
+                eps = np.array([[eps_gen(*(i,j)) for i in range(dim)] for j in range(dim)])
+            elif rank == 3:
+                eps = np.array([[[eps_gen(*(i,j,k)) for i in range(dim)] for j in range(dim)] for k in range(dim)])
+            elif rank ==4:
+                eps = np.array([[[[eps_gen(*(i,j,k,u)) for i in range(dim)] for j in range(dim)] for k in range(dim)] for u in range(dim)])
+                
+        return eps
+    
+    
+    
+    
+
+
+
+
+
+
+
+    def div(self, T, args):
+        self.plopp = T
+        pass
+
+    def curl(self, T, args):
+        pass
+
             
             
             
