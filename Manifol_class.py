@@ -734,7 +734,9 @@ class Manifold:
                         else:
                             return None
                         
-                    MIN = min(list(args)),MAX = max(list(args)), args = list(args)
+                    MIN = min(list(args))
+                    MAX = max(list(args))
+                    args = list(args)
                     
                     if MIN != 0:
                         comp = tuple([i for i in range(MIN, MAX+2)])
